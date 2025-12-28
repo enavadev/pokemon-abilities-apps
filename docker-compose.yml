@@ -1,0 +1,58 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: pokemons-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - pokemons-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  back-end:
+    build:
+      context: ./back-end
+      dockerfile: Dockerfile
+    container_name: pokemons-back-end
+    ports:
+      - "18081:18081"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=your-secret-key-change-in-production
+      - NODE_ENV=production
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - pokemons-network
+    restart: unless-stopped
+
+  front-end:
+    build:
+      context: ./front-end
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:18081
+    container_name: pokemons-front-end
+    ports:
+      - "18080:18080"
+    depends_on:
+      - back-end
+    networks:
+      - pokemons-network
+    restart: unless-stopped
+
+networks:
+  pokemons-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+
